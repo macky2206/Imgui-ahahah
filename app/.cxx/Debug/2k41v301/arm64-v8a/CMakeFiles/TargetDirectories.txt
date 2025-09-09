@@ -1,0 +1,3 @@
+/workspaces/codespaces-blank/ImGui-Android-Mod-Menu/app/.cxx/Debug/2k41v301/arm64-v8a/CMakeFiles/rebuild_cache.dir
+/workspaces/codespaces-blank/ImGui-Android-Mod-Menu/app/.cxx/Debug/2k41v301/arm64-v8a/CMakeFiles/edit_cache.dir
+/workspaces/codespaces-blank/ImGui-Android-Mod-Menu/app/.cxx/Debug/2k41v301/arm64-v8a/CMakeFiles/native-lib.dir
