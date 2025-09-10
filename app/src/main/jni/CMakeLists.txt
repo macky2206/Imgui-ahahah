@@ -26,6 +26,7 @@ set(SRC_FILES
 	Menu/Menu.cpp
 	Menu/Themes.cpp
 	Includes/JNIStuff.cpp
+	InputHook.cpp
 	Substrate/hde64.c
 	Substrate/SubstrateDebug.cpp
 	Substrate/SubstrateHook.cpp

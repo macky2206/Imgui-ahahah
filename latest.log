@@ -1,0 +1,44 @@
+09-10 13:32:53.101 23805 23805 I xTool   : lib_main: Exit
+09-10 13:32:53.101 23805 23838 I xTool   : hack_thread started
+09-10 13:32:53.107 23805 23805 I xTool   : JNI_OnLoad: Successfully installed RegisterNatives hook
+09-10 13:32:53.117 23805 23805 I xTool   : hook_RegisterNatives: registering 2 methods for class
+09-10 13:32:53.164 23805 23805 I xTool   : hook_RegisterNatives: registering 26 methods for class
+09-10 13:32:53.164 23805 23805 I xTool   : hook_RegisterNatives: hooking nativeSetInputString
+09-10 13:32:53.164 23805 23805 I xTool   : hook_RegisterNatives: hooking nativeInjectEvent
+09-10 13:32:53.164 23805 23805 I xTool   : hook_RegisterNatives: registering 1 methods for class
+09-10 13:32:53.164 23805 23805 I xTool   : hook_RegisterNatives: registering 2 methods for class
+09-10 13:32:53.164 23805 23805 I xTool   : hook_RegisterNatives: registering 3 methods for class
+09-10 13:32:53.165 23805 23805 I xTool   : hook_RegisterNatives: registering 4 methods for class
+09-10 13:32:53.165 23805 23805 I xTool   : hook_RegisterNatives: registering 2 methods for class
+09-10 13:32:53.165 23805 23805 I xTool   : hook_RegisterNatives: registering 1 methods for class
+09-10 13:32:53.165 23805 23805 I xTool   : hook_RegisterNatives: registering 1 methods for class
+09-10 13:32:53.165 23805 23805 I xTool   : hook_RegisterNatives: registering 1 methods for class
+09-10 13:32:53.190 23805 23805 I xTool   : hook_RegisterNatives: registering 1 methods for class
+09-10 13:32:53.651 23805 23841 I xTool   : hook_RegisterNatives: registering 3 methods for class
+09-10 13:32:53.959 23805 23879 I xTool   : JNIStuff: getEnv called
+09-10 13:32:53.959 23805 23879 W xTool   : JNIStuff: GetEnv failed, trying AttachCurrentThread
+09-10 13:32:53.960 23805 23879 I xTool   : JNIStuff: getEnv success
+09-10 13:32:53.960 23805 23879 I xTool   : GetUnitySurface: called
+09-10 13:32:53.960 23805 23879 I xTool   : GetUnitySurface: Getting Unity Activity
+09-10 13:32:53.960 23805 23879 I xTool   : GetUnitySurface: Getting Unity Player Field
+09-10 13:32:53.960 23805 23879 I xTool   : GetUnitySurface: Getting Unity Player Object
+09-10 13:32:53.961 23805 23879 I xTool   : GetUnitySurface: Getting View Method
+09-10 13:32:53.961 23805 23879 I xTool   : GetUnitySurface: Calling getView Method
+09-10 13:32:53.962 23805 23879 I xTool   : GetUnitySurface: Getting Surface from Holder
+09-10 13:32:53.963 23805 23879 I xTool   : GetUnitySurface: Calling getSurface Method
+09-10 13:32:53.963 23805 23879 I xTool   : GetUnitySurface: Successfully obtained Surface
+09-10 13:32:53.963 23805 23879 I xTool   : SetupImGui: Successfully got Surface from Unity
+09-10 13:32:53.963 23805 23879 I xTool   : SetupImGui: Obtained ANativeWindow from Surface
+09-10 13:32:53.963 23805 23879 I xTool   : SetupImGui: ImGui initialized successfully
+09-10 13:32:54.103 23805 23838 I xTool   : Library loaded: libil2cpp.so
+09-10 13:32:54.103 23805 23838 I xTool   : Library address: 0x77b7287000
+09-10 13:32:54.103 23805 23838 I xTool   : hack_thread finished setup
+09-10 13:33:26.176 23805 23805 D xTool   : Processing Touch Event!
+09-10 13:33:26.176 23805 23805 D xTool   : Touch Event: action=0 x=257 y=213 pointers=1
+09-10 13:33:26.176 23805 23805 I xTool   : Touch Event Processed (action=0)
+09-10 13:33:26.200 23805 23805 D xTool   : Processing Touch Event!
+09-10 13:33:26.200 23805 23805 D xTool   : Touch Event: action=1 x=257 y=213 pointers=1
+09-10 13:33:26.200 23805 23805 I xTool   : Touch Event Processed (action=1)
+09-10 13:33:26.266 23805 23879 I xTool   : DrawImGuiMenu: Displaying keyboard
+09-10 13:33:26.266 23805 23879 I xTool   : JNIStuff: getEnv called
+09-10 13:33:26.266 23805 23879 I xTool   : JNIStuff: getEnv success

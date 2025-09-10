@@ -32,7 +32,14 @@ JNI_OnLoad(JavaVM *vm, void *reserved)
     vm->GetEnv((void **)&globalEnv, JNI_VERSION_1_6);
     UnityPlayer_cls = globalEnv->FindClass(OBFUSCATE("com/unity3d/player/UnityPlayer"));
     UnityPlayer_CurrentActivity_fid = globalEnv->GetStaticFieldID(UnityPlayer_cls, OBFUSCATE("currentActivity"), OBFUSCATE("Landroid/app/Activity;"));
-    DobbyHook((void *)globalEnv->functions->RegisterNatives, (void *)hook_RegisterNatives, (void **)&old_RegisterNatives);
+    if (DobbyHook((void *)globalEnv->functions->RegisterNatives, (void *)hook_RegisterNatives, (void **)&old_RegisterNatives) == 0)
+    {
+        LOGI("JNI_OnLoad: Successfully installed RegisterNatives hook");
+    }
+    else
+    {
+        LOGE("JNI_OnLoad: Failed to install RegisterNatives hook");
+    }
 
     return JNI_VERSION_1_6;
 }

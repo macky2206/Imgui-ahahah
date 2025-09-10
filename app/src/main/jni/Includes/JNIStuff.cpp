@@ -3,6 +3,7 @@
 #include "Includes/obfuscate.h"
 #include <jni.h>
 #include <stddef.h>
+#include <cstring>
 
 JavaVM *jvm = nullptr;
 jclass UnityPlayer_cls = nullptr;
@@ -53,6 +54,73 @@ jobject getGlobalContext(JNIEnv *env)
     return context;
 }
 
+// Recursive helper: traverses the view hierarchy to find a SurfaceView and
+// returns its SurfaceHolder (or nullptr). Uses IsInstanceOf checks instead
+// of class-name string matching to avoid relying on obfuscated names.
+static jobject findSurfaceHolderRecursive(JNIEnv *env, jobject view)
+{
+    if (!view)
+        return nullptr;
+
+    // Check if this view is a SurfaceView
+    jclass surfaceViewClass = env->FindClass("android/view/SurfaceView");
+    if (surfaceViewClass)
+    {
+        if (env->IsInstanceOf(view, surfaceViewClass))
+        {
+            jclass svCls = env->GetObjectClass(view);
+            jmethodID getHolderMethod = env->GetMethodID(svCls, "getHolder", "()Landroid/view/SurfaceHolder;");
+            jobject holder = nullptr;
+            if (getHolderMethod)
+            {
+                holder = env->CallObjectMethod(view, getHolderMethod);
+                if (env->ExceptionCheck())
+                {
+                    env->ExceptionDescribe();
+                    env->ExceptionClear();
+                    holder = nullptr;
+                }
+            }
+            env->DeleteLocalRef(svCls);
+            env->DeleteLocalRef(surfaceViewClass);
+            return holder;
+        }
+        env->DeleteLocalRef(surfaceViewClass);
+    }
+
+    // If view is a ViewGroup, recurse into children
+    jclass viewGroupClass = env->FindClass("android/view/ViewGroup");
+    if (!viewGroupClass)
+        return nullptr;
+
+    if (env->IsInstanceOf(view, viewGroupClass))
+    {
+        jmethodID getChildCountMethod = env->GetMethodID(viewGroupClass, "getChildCount", "()I");
+        jmethodID getChildAtMethod = env->GetMethodID(viewGroupClass, "getChildAt", "(I)Landroid/view/View;");
+        if (!getChildCountMethod || !getChildAtMethod)
+        {
+            env->DeleteLocalRef(viewGroupClass);
+            return nullptr;
+        }
+        int childCount = env->CallIntMethod(view, getChildCountMethod);
+        for (int i = 0; i < childCount; ++i)
+        {
+            jobject child = env->CallObjectMethod(view, getChildAtMethod, i);
+            if (!child)
+                continue;
+            jobject holder = findSurfaceHolderRecursive(env, child);
+            env->DeleteLocalRef(child);
+            if (holder)
+            {
+                env->DeleteLocalRef(viewGroupClass);
+                return holder;
+            }
+        }
+    }
+    env->DeleteLocalRef(viewGroupClass);
+    return nullptr;
+}
+
 jobject GetUnitySurface(JNIEnv *env)
 {
     LOGI(OBFUSCATE("GetUnitySurface: called"), 1);
@@ -91,67 +159,11 @@ jobject GetUnitySurface(JNIEnv *env)
         LOGE(OBFUSCATE("GetUnitySurface: Failed to get View object"), 1);
         return nullptr;
     }
-    // Print the actual class name of the view
-    jclass viewClass = env->GetObjectClass(view);
-    jmethodID getClassMethod = env->GetMethodID(viewClass, "getClass", "()Ljava/lang/Class;");
-    jobject classObj = env->CallObjectMethod(view, getClassMethod);
-    jclass classClass = env->FindClass("java/lang/Class");
-    jmethodID getNameMethod = env->GetMethodID(classClass, "getName", "()Ljava/lang/String;");
-    jstring nameStr = (jstring)env->CallObjectMethod(classObj, getNameMethod);
-    const char *nameCStr = env->GetStringUTFChars(nameStr, 0);
-    LOGI(("GetUnitySurface: View class name: %s"), nameCStr, 1);
-    env->ReleaseStringUTFChars(nameStr, nameCStr);
-
-    LOGI("GetUnitySurface: Trying getHolder on UnityPlayer view", 1);
-    jmethodID getHolderMethod = env->GetMethodID(viewClass, "getHolder", "()Landroid/view/SurfaceHolder;");
-    jobject holder = nullptr;
-    if (getHolderMethod)
-    {
-        holder = env->CallObjectMethod(view, getHolderMethod);
-        if (holder)
-        {
-            LOGI("GetUnitySurface: Got SurfaceHolder from UnityPlayer view", 1);
-        }
-    }
+    // Use recursive helper to find a SurfaceView's SurfaceHolder anywhere in the view tree
+    jobject holder = findSurfaceHolderRecursive(env, view);
     if (!holder)
     {
-        LOGI("GetUnitySurface: Searching for SurfaceView child", 1);
-        jclass viewGroupClass = env->FindClass("android/view/ViewGroup");
-        if (env->IsInstanceOf(view, viewGroupClass))
-        {
-            jmethodID getChildCountMethod = env->GetMethodID(viewGroupClass, "getChildCount", "()I");
-            jmethodID getChildAtMethod = env->GetMethodID(viewGroupClass, "getChildAt", "(I)Landroid/view/View;");
-            int childCount = env->CallIntMethod(view, getChildCountMethod);
-            for (int i = 0; i < childCount; ++i)
-            {
-                jobject childView = env->CallObjectMethod(view, getChildAtMethod, i);
-                jclass childClass = env->GetObjectClass(childView);
-                jobject childClassObj = env->CallObjectMethod(childView, getClassMethod);
-                jstring childNameStr = (jstring)env->CallObjectMethod(childClassObj, getNameMethod);
-                const char *childNameCStr = env->GetStringUTFChars(childNameStr, 0);
-                LOGI(("GetUnitySurface: Child %d class name: %s"), i, childNameCStr, 1);
-                env->ReleaseStringUTFChars(childNameStr, childNameCStr);
-                // Try getHolder on child
-                jmethodID childGetHolderMethod = env->GetMethodID(childClass, "getHolder", "()Landroid/view/SurfaceHolder;");
-                if (childGetHolderMethod)
-                {
-                    holder = env->CallObjectMethod(childView, childGetHolderMethod);
-                    if (holder)
-                    {
-                        LOGI(("GetUnitySurface: Got SurfaceHolder from child %d"), i, 1);
-                        break;
-                    }
-                }
-            }
-        }
-        else
-        {
-            LOGI("GetUnitySurface: UnityPlayer view is not a ViewGroup", 1);
-        }
-    }
-    if (!holder)
-    {
-        LOGE(OBFUSCATE("GetUnitySurface: Failed to get SurfaceHolder object from UnityPlayer or its children"), 1);
+        LOGE(OBFUSCATE("GetUnitySurface: Failed to get SurfaceHolder object from UnityPlayer view hierarchy"), 1);
         return nullptr;
     }
     LOGI(OBFUSCATE("GetUnitySurface: Getting Surface from Holder"), 1);

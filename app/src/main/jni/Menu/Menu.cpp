@@ -6,12 +6,14 @@
 #include "Includes/Logger.h"
 #include "Includes/JNIStuff.h"
 #include <android/native_window_jni.h>
+#include "Includes/Loader.h"
 
 using namespace ImGui;
 bool init = false;
 int glWidth = 0;
 int glHeight = 0;
 ANativeWindow *window = nullptr;
+bool isSurface = false;
 
 void SetupImGui()
 {
@@ -39,12 +41,22 @@ void SetupImGui()
         jobject surface = GetUnitySurface(env);
         if (surface)
         {
+            LOGI("SetupImGui: Successfully got Surface from Unity");
             window = ANativeWindow_fromSurface(env, surface);
-            if (!window) {
+            if (!window)
+            {
                 LOGE("SetupImGui: Failed to get ANativeWindow from surface");
             }
+            else
+            {
+                LOGI("SetupImGui: Obtained ANativeWindow from Surface");
+                isSurface = true;
+            }
         }
-        LOGE("SetupImGui: Failed getting surface");
+        else
+        {
+            LOGE("SetupImGui: Failed getting surface");
+        }
         ImGui_ImplAndroid_Init(window);
         ImGui_ImplOpenGL3_Init();
 
@@ -93,6 +105,7 @@ namespace Menu
                 {
                     static char inputText[128] = "";
                     ImGui::InputText("Input", inputText, IM_ARRAYSIZE(inputText));
+                    ImGui::Text("Rendering: %s", isSurface ? "Surface" : "EGL");
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Section 2"))
@@ -249,6 +262,8 @@ namespace Menu
         if (init && glHeight != 0)
         {
             ImGuiIO &io = ImGui::GetIO();
+            // Drain any text queued by native IME hook into ImGui on the render thread
+            DrainQueuedInputToImGui();
             static bool WantTextInputLast = false;
             if (io.WantTextInput && !WantTextInputLast)
             {
