@@ -395,6 +395,7 @@ void ImGui_ImplAndroid_NewFrame(int w, int h)
     int32_t window_height;
     if (g_Window != nullptr)
     {
+        LOGI("Using window size from ANativeWindow: %dx%d", ANativeWindow_getWidth(g_Window), ANativeWindow_getHeight(g_Window));
         window_width = ANativeWindow_getWidth(g_Window);
         window_height = ANativeWindow_getHeight(g_Window);
     }
@@ -403,7 +404,6 @@ void ImGui_ImplAndroid_NewFrame(int w, int h)
         window_width = w;
         window_height = h;
     }
-    // Setup display size (every frame to accommodate for window resizing)
 
     int display_width = window_width;
     int display_height = window_height;

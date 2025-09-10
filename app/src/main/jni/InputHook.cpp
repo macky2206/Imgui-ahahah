@@ -146,7 +146,6 @@ jboolean hook_nativeInjectEvent(JNIEnv *env, jobject instance, jobject event)
         }
         else if (action == 0 && uni != 0)
         {
-            // Convert unicode code point to UTF-8
             char buf[5] = {0};
             if (uni < 0x80)
             {
