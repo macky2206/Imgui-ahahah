@@ -393,14 +393,13 @@ void ImGui_ImplAndroid_NewFrame(int w, int h)
 
     int32_t window_width;
     int32_t window_height;
-    if (g_Window != nullptr)
+    __android_log_print(ANDROID_LOG_INFO, "xTool", "Using window size from ANativeWindow: %dx%d", ANativeWindow_getWidth(g_Window), ANativeWindow_getHeight(g_Window));
+    window_width = ANativeWindow_getWidth(g_Window);
+    window_height = ANativeWindow_getHeight(g_Window);
+
+    if (window_width <= 0 || window_height <= 0)
     {
-        LOGI("Using window size from ANativeWindow: %dx%d", ANativeWindow_getWidth(g_Window), ANativeWindow_getHeight(g_Window));
-        window_width = ANativeWindow_getWidth(g_Window);
-        window_height = ANativeWindow_getHeight(g_Window);
-    }
-    else
-    {
+        __android_log_print(ANDROID_LOG_INFO, "xTool", "Using window size from parameters: %dx%d", w, h);
         window_width = w;
         window_height = h;
     }
