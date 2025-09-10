@@ -1,7 +1,0 @@
-Executable : /home/codespace/Android/Sdk/cmake/3.10.2.4988404/bin/ninja
-arguments : 
--C
-/workspaces/codespaces-blank/ImGui-Android-Mod-Menu/app/.cxx/Debug/2k41v301/arm64-v8a
-native-lib
-jvmArgs : 
-

@@ -1,3 +1,0 @@
-ninja: Entering directory `/workspaces/codespaces-blank/ImGui-Android-Mod-Menu/app/.cxx/Debug/2k41v301/arm64-v8a'
-[1/2] Building CXX object CMakeFiles/native-lib.dir/InputHook.cpp.o
-[2/2] Linking CXX shared library /workspaces/codespaces-blank/ImGui-Android-Mod-Menu/app/build/intermediates/cxx/Debug/2k41v301/obj/arm64-v8a/libnative-lib.so

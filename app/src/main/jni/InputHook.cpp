@@ -8,9 +8,6 @@
 static std::mutex g_input_mutex;
 static std::queue<std::string> g_input_queue;
 
-// define the original pointer declared extern in Loader.h
-void (*old_nativeSetInputString)(JNIEnv *env, jobject instance, jstring str) = nullptr;
-
 void DrainQueuedInputToImGui()
 {
     std::lock_guard<std::mutex> lk(g_input_mutex);
@@ -18,15 +15,25 @@ void DrainQueuedInputToImGui()
     int drained = 0;
     while (!g_input_queue.empty())
     {
-        io.AddInputCharactersUTF8(g_input_queue.front().c_str());
+        std::string s = g_input_queue.front();
         g_input_queue.pop();
+        // Special token for backspace
+        if (s == "\b")
+        {
+            // Simulate a backspace key press (down then up)
+            io.AddKeyEvent(ImGuiKey_Backspace, true);
+            io.AddKeyEvent(ImGuiKey_Backspace, false);
+        }
+        else
+        {
+            io.AddInputCharactersUTF8(s.c_str());
+        }
         drained++;
     }
     if (drained > 0)
         LOGI("Drained %d IME input(s) into ImGui", drained);
 }
 
-// implement getString and global vars
 const char *getString(uintptr_t offset)
 {
     static std::string convert;
@@ -37,13 +44,10 @@ const char *getString(uintptr_t offset)
 uintptr_t address = 0;
 bool setup = false;
 
-// Touch handling globals and functions
 TOUCH_EVENT g_LastTouchEvent = {TOUCH_ACTION_UP, 0.0f, 0.0f, 0, 0.0f, 0.0f};
 
-// Convert MotionEvent data into ImGui mouse state and update g_LastTouchEvent
 bool HandleInputEvent(JNIEnv *env, int motionEvent, int x, int y, int p)
 {
-    // Update last touch event
     if (motionEvent == 0) // ACTION_DOWN
     {
         g_LastTouchEvent.action = TOUCH_ACTION_DOWN;
@@ -60,7 +64,6 @@ bool HandleInputEvent(JNIEnv *env, int motionEvent, int x, int y, int p)
     g_LastTouchEvent.y = (float)y;
     g_LastTouchEvent.pointers = p;
 
-    // Feed into ImGui IO mouse state
     ImGuiIO &io = ImGui::GetIO();
     if (g_LastTouchEvent.action == TOUCH_ACTION_DOWN)
     {
@@ -75,64 +78,109 @@ bool HandleInputEvent(JNIEnv *env, int motionEvent, int x, int y, int p)
     return true;
 }
 
-// original nativeInjectEvent pointer
 jboolean (*old_nativeInjectEvent)(JNIEnv *env, jobject instance, jobject event) = nullptr;
-
 jboolean hook_nativeInjectEvent(JNIEnv *env, jobject instance, jobject event)
 {
-    jclass MotionEvent = env->FindClass(("android/view/MotionEvent"));
-    if (!MotionEvent)
+    jclass MotionEvent = env->FindClass("android/view/MotionEvent");
+    if (MotionEvent && env->IsInstanceOf(event, MotionEvent))
     {
-        LOGI("Can't find MotionEvent!");
+        jmethodID id_getAct = env->GetMethodID(MotionEvent, "getActionMasked", "()I");
+        jmethodID id_getX = env->GetMethodID(MotionEvent, "getX", "()F");
+        jmethodID id_getY = env->GetMethodID(MotionEvent, "getY", "()F");
+        jmethodID id_getPs = env->GetMethodID(MotionEvent, "getPointerCount", "()I");
+        int action = id_getAct ? env->CallIntMethod(event, id_getAct) : -1;
+        int x = id_getX ? (int)env->CallFloatMethod(event, id_getX) : 0;
+        int y = id_getY ? (int)env->CallFloatMethod(event, id_getY) : 0;
+        int pointers = id_getPs ? env->CallIntMethod(event, id_getPs) : 0;
+        LOGD("Processing Touch Event: action=%d x=%d y=%d pointers=%d", action, x, y, pointers);
+        HandleInputEvent(env, action, x, y, pointers);
+        LOGI("Touch Event Processed (action=%d)", action);
+        if (!ImGui::GetIO().MouseDownOwnedUnlessPopupClose[0])
+        {
+            return old_nativeInjectEvent ? old_nativeInjectEvent(env, instance, event) : JNI_FALSE;
+        }
+        return JNI_TRUE;
     }
 
-    if (!env->IsInstanceOf(event, MotionEvent))
+    // Detect KeyEvent and try to extract committed characters
+    jclass KeyEvent = env->FindClass("android/view/KeyEvent");
+    if (KeyEvent && env->IsInstanceOf(event, KeyEvent))
     {
-        return old_nativeInjectEvent ? old_nativeInjectEvent(env, instance, event) : JNI_FALSE;
-    }
-    LOGD("Processing Touch Event!");
-    jmethodID id_getAct = env->GetMethodID(MotionEvent, ("getActionMasked"), ("()I"));
-    jmethodID id_getX = env->GetMethodID(MotionEvent, ("getX"), ("()F"));
-    jmethodID id_getY = env->GetMethodID(MotionEvent, ("getY"), ("()F"));
-    jmethodID id_getPs = env->GetMethodID(MotionEvent, ("getPointerCount"), ("()I"));
-    int action = env->CallIntMethod(event, id_getAct);
-    int x = (int)env->CallFloatMethod(event, id_getX);
-    int y = (int)env->CallFloatMethod(event, id_getY);
-    int pointers = env->CallIntMethod(event, id_getPs);
-    LOGD("Touch Event: action=%d x=%d y=%d pointers=%d", action, x, y, pointers);
-    HandleInputEvent(env, action, x, y, pointers);
-    LOGI("Touch Event Processed (action=%d)", action);
-    if (!ImGui::GetIO().MouseDownOwnedUnlessPopupClose[0])
-    {
-        return old_nativeInjectEvent ? old_nativeInjectEvent(env, instance, event) : JNI_FALSE;
-    }
-    return JNI_TRUE;
-}
+        LOGD("Processing Key Event");
+        jmethodID id_getAction = env->GetMethodID(KeyEvent, "getAction", "()I");
+        jmethodID id_getKeyCode = env->GetMethodID(KeyEvent, "getKeyCode", "()I");
+        jmethodID id_getUnicodeChar = env->GetMethodID(KeyEvent, "getUnicodeChar", "()I");
+        jmethodID id_getCharacters = env->GetMethodID(KeyEvent, "getCharacters", "()Ljava/lang/String;");
 
-void hook_nativeSetInputString(JNIEnv *env, jobject instance, jstring str)
-{
-    LOGI("hook_nativeSetInputString called");
-    if (str == nullptr)
-    {
-        if (old_nativeSetInputString)
-            old_nativeSetInputString(env, instance, str);
-        return;
+        int action = id_getAction ? env->CallIntMethod(event, id_getAction) : -1;
+        int keycode = id_getKeyCode ? env->CallIntMethod(event, id_getKeyCode) : -1;
+        int uni = id_getUnicodeChar ? env->CallIntMethod(event, id_getUnicodeChar) : 0;
+        LOGD("KeyEvent: action=%d keycode=%d unicode=%d", action, keycode, uni);
+
+        jstring jchars = NULL;
+        const char *chars = NULL;
+        if (action == 2 && id_getCharacters && (keycode != 67)) // Exclude DEL key
+        {
+            jchars = (jstring)env->CallObjectMethod(event, id_getCharacters);
+            if (jchars)
+                chars = env->GetStringUTFChars(jchars, nullptr);
+        }
+
+        if (action == 2 && chars && chars[0] != '\0') // Only enqueue for ACTION_MULTIPLE
+        {
+            std::lock_guard<std::mutex> lk(g_input_mutex);
+            g_input_queue.push(std::string(chars));
+            LOGI("hook_nativeInjectEvent queued ACTION_MULTIPLE text: %.128s", chars);
+            env->ReleaseStringUTFChars(jchars, chars);
+        }
+        else if (uni != 0)
+        {
+            // Convert unicode code point to UTF-8
+            char buf[5] = {0};
+            if (uni < 0x80)
+            {
+                buf[0] = (char)uni;
+            }
+            else if (uni < 0x800)
+            {
+                buf[0] = (char)(0xC0 | ((uni >> 6) & 0x1F));
+                buf[1] = (char)(0x80 | (uni & 0x3F));
+            }
+            else if (uni < 0x10000)
+            {
+                buf[0] = (char)(0xE0 | ((uni >> 12) & 0x0F));
+                buf[1] = (char)(0x80 | ((uni >> 6) & 0x3F));
+                buf[2] = (char)(0x80 | (uni & 0x3F));
+            }
+            else
+            {
+                buf[0] = (char)(0xF0 | ((uni >> 18) & 0x07));
+                buf[1] = (char)(0x80 | ((uni >> 12) & 0x3F));
+                buf[2] = (char)(0x80 | ((uni >> 6) & 0x3F));
+                buf[3] = (char)(0x80 | (uni & 0x3F));
+            }
+            std::lock_guard<std::mutex> lk(g_input_mutex);
+            g_input_queue.push(std::string(buf));
+            LOGI("hook_nativeInjectEvent queued unicode char: %s", buf);
+        }
+        else if (action == 0 && keycode == 67) // ACTION_DOWN and DEL key
+        {
+            // Backspace (KEYCODE_DEL)
+            std::lock_guard<std::mutex> lk(g_input_mutex);
+            g_input_queue.push(std::string("\b"));
+            LOGI("hook_nativeInjectEvent queued backspace token");
+        }
+
+        // Forward KeyEvent to original implementation
+        return old_nativeInjectEvent ? old_nativeInjectEvent(env, instance, event) : JNI_FALSE;
     }
-    const char *cstr = env->GetStringUTFChars(str, nullptr);
-    if (cstr)
-    {
-        std::lock_guard<std::mutex> lk(g_input_mutex);
-        g_input_queue.push(std::string(cstr));
-        LOGD("hook_nativeSetInputString queued text: %.128s", cstr);
-        env->ReleaseStringUTFChars(str, cstr);
-    }
-    if (old_nativeSetInputString)
-        old_nativeSetInputString(env, instance, str);
+
+    // Not MotionEvent or KeyEvent -> forward
+    return old_nativeInjectEvent ? old_nativeInjectEvent(env, instance, event) : JNI_FALSE;
 }
 
 // RegisterNatives hook implementation
 jint (*old_RegisterNatives)(JNIEnv *, jclass, JNINativeMethod *, jint) = nullptr;
-
 jint hook_RegisterNatives(JNIEnv *env, jclass destinationClass, JNINativeMethod *methods, jint totalMethodCount)
 {
     // Try to get the java class name for better diagnostics
@@ -154,27 +202,13 @@ jint hook_RegisterNatives(JNIEnv *env, jclass destinationClass, JNINativeMethod 
             }
         }
     }
-    LOGI("hook_RegisterNatives: registering %d methods for class %s", totalMethodCount, classNameC);
     for (int i = 0; i < totalMethodCount; ++i)
     {
-        // Log each native method being registered
-        LOGD("hook_RegisterNatives: method[%d] name=%s sig=%s fnPtr=%p", i, methods[i].name, methods[i].signature, methods[i].fnPtr);
         if (!strcmp(methods[i].name, ("nativeInjectEvent")))
         {
             LOGI("hook_RegisterNatives: hooking nativeInjectEvent");
             DobbyHook(methods[i].fnPtr, (void *)hook_nativeInjectEvent, (void **)&old_nativeInjectEvent);
         }
-        if (!strcmp(methods[i].name, ("nativeSetInputString")))
-        {
-            LOGI("hook_RegisterNatives: hooking nativeSetInputString");
-            DobbyHook(methods[i].fnPtr, (void *)hook_nativeSetInputString, (void **)&old_nativeSetInputString);
-        }
     }
-    // Release the class name C string if we obtained it
-    if (classNameC && strcmp(classNameC, "<unknown>") != 0)
-    {
-        // We called GetStringUTFChars earlier, find the original jstring to release
-        // It's safe to call ReleaseStringUTFChars with a NULL jstring if we didn't store it; skip releasing here to avoid needing extra variables.
-    }
-    return old_RegisterNatives ? old_RegisterNatives(env, destinationClass, methods, totalMethodCount) : 0;
+    return old_RegisterNatives(env, destinationClass, methods, totalMethodCount);
 }

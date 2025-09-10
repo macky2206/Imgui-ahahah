@@ -33,15 +33,10 @@ typedef struct
 } TOUCH_EVENT;
 extern TOUCH_EVENT g_LastTouchEvent;
 
-// Drain queued IME input into ImGui (implemented in InputHook.cpp)
 void DrainQueuedInputToImGui();
 
-// Hooks and globals declared; implementations are in InputHook.cpp
 extern jboolean (*old_nativeInjectEvent)(JNIEnv *env, jobject instance, jobject event);
-extern void (*old_nativeSetInputString)(JNIEnv *env, jobject instance, jstring str);
-extern jint (*old_RegisterNatives)(JNIEnv *, jclass, JNINativeMethod *, jint);
-
-// Hook functions implemented in InputHook.cpp
 jboolean hook_nativeInjectEvent(JNIEnv *env, jobject instance, jobject event);
-void hook_nativeSetInputString(JNIEnv *env, jobject instance, jstring str);
+
+extern jint (*old_RegisterNatives)(JNIEnv *, jclass, JNINativeMethod *, jint);
 jint hook_RegisterNatives(JNIEnv *env, jclass destinationClass, JNINativeMethod *methods, jint totalMethodCount);
