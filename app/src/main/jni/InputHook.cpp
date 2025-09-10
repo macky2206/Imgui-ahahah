@@ -4,9 +4,12 @@
 #include <queue>
 #include <string>
 #include "ImGui/imgui.h"
+#include <chrono>
 
 static std::mutex g_input_mutex;
 static std::queue<std::string> g_input_queue;
+static std::string g_last_queued;
+static long long g_last_queued_ms = 0;
 
 void DrainQueuedInputToImGui()
 {
@@ -128,12 +131,20 @@ jboolean hook_nativeInjectEvent(JNIEnv *env, jobject instance, jobject event)
 
         if (action == 2 && chars && chars[0] != '\0') // Only enqueue for ACTION_MULTIPLE
         {
-            std::lock_guard<std::mutex> lk(g_input_mutex);
-            g_input_queue.push(std::string(chars));
-            LOGI("hook_nativeInjectEvent queued ACTION_MULTIPLE text: %.128s", chars);
+            // dedupe quick duplicates
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            std::string q(chars);
+            if (!(q == g_last_queued && (now - g_last_queued_ms) < 50))
+            {
+                std::lock_guard<std::mutex> lk(g_input_mutex);
+                g_input_queue.push(q);
+                g_last_queued = q;
+                g_last_queued_ms = now;
+                LOGI("hook_nativeInjectEvent queued ACTION_MULTIPLE text: %.128s", chars);
+            }
             env->ReleaseStringUTFChars(jchars, chars);
         }
-        else if (uni != 0)
+        else if (action == 0 && uni != 0)
         {
             // Convert unicode code point to UTF-8
             char buf[5] = {0};
@@ -159,16 +170,30 @@ jboolean hook_nativeInjectEvent(JNIEnv *env, jobject instance, jobject event)
                 buf[2] = (char)(0x80 | ((uni >> 6) & 0x3F));
                 buf[3] = (char)(0x80 | (uni & 0x3F));
             }
-            std::lock_guard<std::mutex> lk(g_input_mutex);
-            g_input_queue.push(std::string(buf));
-            LOGI("hook_nativeInjectEvent queued unicode char: %s", buf);
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            std::string q(buf);
+            if (!(q == g_last_queued && (now - g_last_queued_ms) < 50))
+            {
+                std::lock_guard<std::mutex> lk(g_input_mutex);
+                g_input_queue.push(q);
+                g_last_queued = q;
+                g_last_queued_ms = now;
+                LOGI("hook_nativeInjectEvent queued unicode char: %s", buf);
+            }
         }
         else if (action == 0 && keycode == 67) // ACTION_DOWN and DEL key
         {
             // Backspace (KEYCODE_DEL)
-            std::lock_guard<std::mutex> lk(g_input_mutex);
-            g_input_queue.push(std::string("\b"));
-            LOGI("hook_nativeInjectEvent queued backspace token");
+            auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            std::string q("\b");
+            if (!(q == g_last_queued && (now - g_last_queued_ms) < 50))
+            {
+                std::lock_guard<std::mutex> lk(g_input_mutex);
+                g_input_queue.push(q);
+                g_last_queued = q;
+                g_last_queued_ms = now;
+                LOGI("hook_nativeInjectEvent queued backspace token");
+            }
         }
 
         // Forward KeyEvent to original implementation
